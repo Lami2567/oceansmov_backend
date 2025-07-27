@@ -15,7 +15,11 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 // CORS configuration for production
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://your-domain.com'] 
+    ? [
+        process.env.FRONTEND_URL || 'https://your-domain.com',
+        'https://oceansmov-5jrsz4urx-lanes-projects-cbbebf7b.vercel.app',
+        'https://*.vercel.app'
+      ] 
     : 'http://localhost:3000',
   credentials: true
 };
