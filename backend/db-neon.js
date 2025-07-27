@@ -8,13 +8,32 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-// Parse connection string
-const url = new URL(process.env.DATABASE_URL);
-const hostname = url.hostname;
-const port = url.port || 5432;
-const database = url.pathname.slice(1);
-const username = url.username;
-const password = url.password;
+// Parse connection string - handle both direct URLs and psql command format
+let hostname, port, database, username, password;
+
+if (process.env.DATABASE_URL.startsWith('psql')) {
+  // Handle psql command format - extract the actual connection string
+  const connectionStringMatch = process.env.DATABASE_URL.match(/postgresql:\/\/[^']+/);
+  if (connectionStringMatch) {
+    const connectionString = connectionStringMatch[0];
+    const url = new URL(connectionString);
+    hostname = url.hostname;
+    port = url.port || 5432;
+    database = url.pathname.slice(1);
+    username = url.username;
+    password = url.password;
+  } else {
+    throw new Error('Invalid psql connection string format');
+  }
+} else {
+  // Handle direct URL format
+  const url = new URL(process.env.DATABASE_URL);
+  hostname = url.hostname;
+  port = url.port || 5432;
+  database = url.pathname.slice(1);
+  username = url.username;
+  password = url.password;
+}
 
 console.log('📍 Connecting to Neon:', hostname, 'Port:', port, 'Database:', database);
 
