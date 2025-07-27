@@ -1,2 +1,2 @@
-// Use the simpler database connection approach
-module.exports = require('./db-simple'); 
+// Use the alternative database connection approach
+module.exports = require('./db-alternative'); 

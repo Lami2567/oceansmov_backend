@@ -66,6 +66,30 @@ async function createConnection() {
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 30000
       })
+    },
+    {
+      name: 'Connection string with sslmode=prefer',
+      config: () => ({
+        connectionString: process.env.DATABASE_URL + '&sslmode=prefer',
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 30000
+      })
+    },
+    {
+      name: 'Connection string with sslmode=allow',
+      config: () => ({
+        connectionString: process.env.DATABASE_URL + '&sslmode=allow',
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 30000
+      })
+    },
+    {
+      name: 'Connection string with sslmode=disable',
+      config: () => ({
+        connectionString: process.env.DATABASE_URL + '&sslmode=disable',
+        ssl: false,
+        connectionTimeoutMillis: 30000
+      })
     }
   ];
 
