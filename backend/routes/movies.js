@@ -3,10 +3,12 @@ const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const { s3 } = require('../config/wasabi');
+const { s3Client } = require('../config/wasabi');
 
 // Helper function to upload to Wasabi
 const uploadToWasabi = async (file, key) => {
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  
   const params = {
     Bucket: process.env.WASABI_BUCKET_NAME,
     Key: key,
@@ -15,8 +17,8 @@ const uploadToWasabi = async (file, key) => {
     ACL: 'public-read'
   };
   
-  const result = await s3.upload(params).promise();
-  return result.Location;
+  await s3Client.send(new PutObjectCommand(params));
+  return `${process.env.WASABI_ENDPOINT}/${process.env.WASABI_BUCKET_NAME}/${key}`;
 };
 
 // Test route to verify server is working

@@ -1,13 +1,15 @@
-const AWS = require('aws-sdk');
+const { S3Client } = require('@aws-sdk/client-s3');
 
 const wasabiConfig = {
-  accessKeyId: process.env.WASABI_ACCESS_KEY_ID,
-  secretAccessKey: process.env.WASABI_SECRET_ACCESS_KEY,
   region: process.env.WASABI_REGION,
   endpoint: process.env.WASABI_ENDPOINT,
-  s3ForcePathStyle: true
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.WASABI_ACCESS_KEY_ID,
+    secretAccessKey: process.env.WASABI_SECRET_ACCESS_KEY,
+  }
 };
 
-const s3 = new AWS.S3(wasabiConfig);
+const s3Client = new S3Client(wasabiConfig);
 
-module.exports = { s3, wasabiConfig }; 
+module.exports = { s3Client, wasabiConfig }; 

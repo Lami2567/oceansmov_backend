@@ -18,6 +18,7 @@ const corsOptions = {
     ? [
         process.env.FRONTEND_URL || 'https://your-domain.com',
         'https://oceansmov-5jrsz4urx-lanes-projects-cbbebf7b.vercel.app',
+        'https://oceansmov.vercel.app',
         'https://*.vercel.app'
       ] 
     : 'http://localhost:3000',
@@ -40,15 +41,18 @@ app.use('/api/movies', moviesRouter);
 app.use('/api/reviews', reviewsRouter);
 app.use('/api', testRouter);
 
-// Serve React app in production
-if (process.env.NODE_ENV === 'production') {
-  // Serve static files from the React app build directory
-  app.use(express.static(path.join(__dirname, '../client/build')));
-
-  // Handle React routing, return all requests to React app
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+// API-only backend - frontend is served by Vercel
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Movie Web API is running',
+    version: '1.0.0',
+    endpoints: {
+      test: '/api/test',
+      movies: '/api/movies',
+      users: '/api/users',
+      reviews: '/api/reviews'
+    }
   });
-}
+});
 
 module.exports = app;
