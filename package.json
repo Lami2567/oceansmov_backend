@@ -4,17 +4,24 @@
   "description": "A movie streaming web application with PostgreSQL backend and React frontend",
   "main": "backend/bin/www",
   "scripts": {
-    "start": "node backend/bin/www",
+    "start": "cd backend && node bin/www",
     "server": "cd backend && npm start",
     "client": "cd client && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "build": "cd client && npm run build",
-    "install-all": "npm install && cd backend && npm install && cd ../client && npm install"
+    "install-all": "npm install && cd backend && npm install && cd ../client && npm install",
+    "postinstall": "cd backend && npm install"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "multer": "^2.0.2",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "dotenv": "^17.2.1",
+    "express": "~4.16.1",
+    "cors": "^2.8.5",
+    "pg": "^8.16.3",
+    "jsonwebtoken": "^9.0.2",
+    "aws-sdk": "^2.1692.0"
   },
   "engines": {
     "node": ">=16.0.0",
