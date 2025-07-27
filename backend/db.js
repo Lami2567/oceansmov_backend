@@ -1,2 +1,2 @@
-// Use the alternative database connection approach
-module.exports = require('./db-alternative'); 
+// Use the intelligent auto-debug database connection system
+module.exports = require('./db-auto-debug'); 
