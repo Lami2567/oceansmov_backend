@@ -28,11 +28,13 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 const moviesRouter = require('./routes/movies');
 const reviewsRouter = require('./routes/reviews');
+const testRouter = require('./routes/test');
 
 app.use('/api', indexRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/movies', moviesRouter);
 app.use('/api/reviews', reviewsRouter);
+app.use('/api', testRouter);
 
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {

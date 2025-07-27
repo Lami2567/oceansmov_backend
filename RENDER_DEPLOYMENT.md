@@ -24,11 +24,13 @@ Since the `render.yaml` approach isn't working, use these manual steps:
 
 ### 3. Environment Variables
 
+**⚠️ CRITICAL: You MUST set these environment variables before deployment!**
+
 Add these environment variables in Render dashboard:
 
 ```
 NODE_ENV=production
-DATABASE_URL=your_supabase_connection_string
+DATABASE_URL=postgresql://postgres:[password]@[host]:5432/postgres
 JWT_SECRET=your_secure_jwt_secret_here
 FRONTEND_URL=https://your-vercel-app.vercel.app
 WASABI_ACCESS_KEY_ID=your_wasabi_access_key
@@ -37,6 +39,11 @@ WASABI_BUCKET_NAME=your_wasabi_bucket_name
 WASABI_REGION=us-east-1
 WASABI_ENDPOINT=https://s3.us-east-1.wasabisys.com
 ```
+
+**Important Notes:**
+- `DATABASE_URL` must be a valid PostgreSQL connection string
+- Get this from your Supabase dashboard → Settings → Database
+- Format: `postgresql://postgres:[password]@[host]:5432/postgres`
 
 ### 4. Advanced Settings
 
