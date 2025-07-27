@@ -13,11 +13,15 @@ console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 // PostgreSQL connection configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false, // Disable SSL for now to test connection
+  ssl: {
+    rejectUnauthorized: false
+  },
   // Connection settings
   connectionTimeoutMillis: 30000,
   idleTimeoutMillis: 30000,
-  max: 20
+  max: 20,
+  // Authentication settings
+  password: process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).password : undefined
 });
 
 // Test the connection
