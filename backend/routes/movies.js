@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const db = require('../db');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { s3Client } = require('../config/wasabi');
@@ -50,7 +50,7 @@ async function requireAdmin(req, res, next) {
   if (req.user && req.user.id) {
     try {
       // Check is_admin from DB
-      const result = await pool.query('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
+      const result = await db.query('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
       if (result.rows.length > 0 && result.rows[0].is_admin) {
         next();
       } else {
@@ -166,7 +166,7 @@ router.get('/', async (req, res) => {
     
     console.log('Movies query:', query, 'Params:', params);
     
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error('Database error:', err);
@@ -177,7 +177,7 @@ router.get('/', async (req, res) => {
 // GET /movies/genres - get all available genres
 router.get('/genres', async (req, res) => {
   try {
-    const result = await pool.query('SELECT DISTINCT genre FROM movies WHERE genre IS NOT NULL AND genre != \'\' ORDER BY genre');
+    const result = await db.query('SELECT DISTINCT genre FROM movies WHERE genre IS NOT NULL AND genre != \'\' ORDER BY genre');
     const genres = result.rows.map(row => row.genre);
     res.json(genres);
   } catch (err) {
@@ -189,7 +189,7 @@ router.get('/genres', async (req, res) => {
 // GET /movies/years - get all available years
 router.get('/years', async (req, res) => {
   try {
-    const result = await pool.query('SELECT DISTINCT release_year FROM movies WHERE release_year IS NOT NULL ORDER BY release_year DESC');
+    const result = await db.query('SELECT DISTINCT release_year FROM movies WHERE release_year IS NOT NULL ORDER BY release_year DESC');
     const years = result.rows.map(row => row.release_year);
     res.json(years);
   } catch (err) {
@@ -201,7 +201,7 @@ router.get('/years', async (req, res) => {
 // GET /movies/:id - movie details
 router.get('/:id', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM movies WHERE id = $1', [req.params.id]);
+    const result = await db.query('SELECT * FROM movies WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Movie not found' });
     res.json(result.rows[0]);
   } catch (err) {
@@ -216,7 +216,7 @@ router.post('/', authenticateJWT, requireAdmin, async (req, res) => {
   if (!title) return res.status(400).json({ message: 'Title is required' });
   
   try {
-    const result = await pool.query(
+    const result = await db.query(
       'INSERT INTO movies (title, description, release_year, genre, poster_url, movie_file_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [title, description, release_year, genre, poster_url, movie_file_url]
     );
@@ -246,7 +246,7 @@ router.post('/:id/poster', authenticateJWT, requireAdmin, (req, res, next) => {
       const key = `posters/${req.params.id}_${Date.now()}_${req.file.originalname}`;
       const posterUrl = await uploadToWasabi(req.file, key);
       
-      await pool.query('UPDATE movies SET poster_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [posterUrl, req.params.id]);
+      await db.query('UPDATE movies SET poster_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [posterUrl, req.params.id]);
       res.json({ poster_url: posterUrl });
     } catch (err) {
       console.error('Poster upload error:', err);
@@ -278,7 +278,7 @@ router.post('/:id/movie', authenticateJWT, requireAdmin, (req, res, next) => {
       const key = `movies/${req.params.id}_${Date.now()}_${req.file.originalname}`;
       const movieUrl = await uploadToWasabi(req.file, key);
       
-      await pool.query('UPDATE movies SET movie_file_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [movieUrl, req.params.id]);
+      await db.query('UPDATE movies SET movie_file_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [movieUrl, req.params.id]);
       res.json({ movie_file_url: movieUrl });
     } catch (err) {
       console.error('Movie upload error:', err);
@@ -292,7 +292,7 @@ router.put('/:id', authenticateJWT, requireAdmin, async (req, res) => {
   const { title, description, release_year, genre, poster_url, movie_file_url } = req.body;
   
   try {
-    const result = await pool.query(
+    const result = await db.query(
       'UPDATE movies SET title = $1, description = $2, release_year = $3, genre = $4, poster_url = $5, movie_file_url = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING *',
       [title, description, release_year, genre, poster_url, movie_file_url, req.params.id]
     );
@@ -312,7 +312,7 @@ router.put('/:id', authenticateJWT, requireAdmin, async (req, res) => {
 router.delete('/:id', authenticateJWT, requireAdmin, async (req, res) => {
   try {
     // First, get the movie details to find the file paths
-    const movieResult = await pool.query('SELECT poster_url, movie_file_url FROM movies WHERE id = $1', [req.params.id]);
+    const movieResult = await db.query('SELECT poster_url, movie_file_url FROM movies WHERE id = $1', [req.params.id]);
     
     if (movieResult.rows.length === 0) {
       return res.status(404).json({ message: 'Movie not found' });
@@ -350,7 +350,7 @@ router.delete('/:id', authenticateJWT, requireAdmin, async (req, res) => {
     }
     
     // Delete the database record
-    await pool.query('DELETE FROM movies WHERE id = $1', [req.params.id]);
+    await db.query('DELETE FROM movies WHERE id = $1', [req.params.id]);
     
     res.json({ 
       message: 'Movie deleted successfully',

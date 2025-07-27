@@ -4,10 +4,10 @@ const router = express.Router();
 // Test endpoint to check environment and database
 router.get('/test', async (req, res) => {
   try {
-    const pool = require('../db');
+    const db = require('../db');
     
     // Test database connection
-    const result = await pool.query('SELECT NOW() as current_time');
+    const result = await db.query('SELECT NOW() as current_time');
     
     res.json({
       status: 'success',

@@ -11,49 +11,98 @@ if (!process.env.DATABASE_URL) {
 console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 
 // PostgreSQL connection configuration with IPv6 support
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-    ca: undefined,
-    key: undefined,
-    cert: undefined,
-    checkServerIdentity: () => undefined
-  },
-  // Connection settings with IPv6 support
-  connectionTimeoutMillis: 60000, // Increased timeout for IPv6
-  idleTimeoutMillis: 30000,
-  max: 20,
-  min: 1,
-  // Application settings
-  application_name: 'movie-web-backend',
-  // IPv6 specific settings
-  family: 6, // Force IPv6
-  lookup: (hostname, options, callback) => {
-    // Custom DNS lookup to prefer IPv6
-    const dns = require('dns');
-    dns.lookup(hostname, { family: 6, all: true }, (err, addresses) => {
-      if (err) {
-        callback(err);
-      } else if (addresses && addresses.length > 0) {
-        // Use first IPv6 address
-        callback(null, addresses[0].address, addresses[0].family);
-      } else {
-        // Fallback to default lookup
-        dns.lookup(hostname, options, callback);
+// Create pool with IPv4 fallback strategy
+let pool;
+
+async function createPool() {
+  const baseConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false,
+      ca: undefined,
+      key: undefined,
+      cert: undefined,
+      checkServerIdentity: () => undefined
+    },
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 20,
+    min: 1,
+    application_name: 'movie-web-backend'
+  };
+
+  // Try IPv6 first, then fallback to IPv4
+  try {
+    console.log('Attempting IPv6 connection...');
+    pool = new Pool({
+      ...baseConfig,
+      family: 6, // Force IPv6
+      connectionTimeoutMillis: 10000, // Shorter timeout for IPv6 test
+      lookup: (hostname, options, callback) => {
+        const dns = require('dns');
+        dns.lookup(hostname, { family: 6, all: true }, (err, addresses) => {
+          if (err) {
+            callback(err);
+          } else if (addresses && addresses.length > 0) {
+            callback(null, addresses[0].address, addresses[0].family);
+          } else {
+            dns.lookup(hostname, options, callback);
+          }
+        });
       }
     });
+
+    // Test the connection
+    await pool.query('SELECT 1');
+    console.log('✅ IPv6 connection successful');
+    return pool;
+  } catch (error) {
+    console.log('❌ IPv6 connection failed:', error.message);
+    console.log('Falling back to IPv4...');
+    
+    // Close the failed pool
+    if (pool) {
+      await pool.end();
+    }
+
+    // Try IPv4
+    try {
+      pool = new Pool({
+        ...baseConfig,
+        family: 4, // Force IPv4
+        connectionTimeoutMillis: 30000
+      });
+
+      // Test the connection
+      await pool.query('SELECT 1');
+      console.log('✅ IPv4 connection successful');
+      return pool;
+    } catch (ipv4Error) {
+      console.log('❌ IPv4 connection also failed:', ipv4Error.message);
+      throw ipv4Error;
+    }
   }
+}
+
+// Initialize pool
+createPool().catch(error => {
+  console.error('Failed to create database pool:', error);
+  process.exit(1);
 });
 
-// Test the connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('Error connecting to PostgreSQL:', err.message);
-    console.error('Please check your DATABASE_URL and database connection.');
-  } else {
-    console.log('Connected to PostgreSQL database successfully');
+// Export functions that work with the pool
+module.exports = {
+  getPool: () => pool,
+  query: async (text, params) => {
+    if (!pool) {
+      throw new Error('Database pool not initialized');
+    }
+    return pool.query(text, params);
+  },
+  getClient: async () => {
+    if (!pool) {
+      throw new Error('Database pool not initialized');
+    }
+    return pool.connect();
   }
-});
-
-module.exports = pool; 
+}; 

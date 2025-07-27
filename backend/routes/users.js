@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const pool = require('../db');
+const db = require('../db');
 
 /* GET users listing. */
 router.get('/', function(req, res, next) {
@@ -16,7 +16,7 @@ router.post('/register', async (req, res) => {
   
   try {
     // Check if user exists
-    const userCheck = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const userCheck = await db.query('SELECT * FROM users WHERE username = $1', [username]);
     
     if (userCheck.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
@@ -24,7 +24,7 @@ router.post('/register', async (req, res) => {
     
     // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id', [username, hashedPassword]);
+    const result = await db.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id', [username, hashedPassword]);
     
     res.status(201).json({ message: 'User registered' });
   } catch (err) {
@@ -39,7 +39,7 @@ router.post('/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ message: 'Username and password required' });
   
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
     
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
