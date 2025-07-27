@@ -41,9 +41,7 @@ console.log('📍 Connecting to Neon:', hostname, 'Port:', port, 'Database:', da
 const createPool = () => {
   const config = {
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false
-    },
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     // Neon-specific optimizations
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,

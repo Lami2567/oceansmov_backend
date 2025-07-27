@@ -5,8 +5,13 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { s3Client } = require('../config/wasabi');
 
-// Helper function to upload to Wasabi
+// Helper function to upload to Wasabi with fallback
 const uploadToWasabi = async (file, key) => {
+  // Check if Wasabi is configured
+  if (!process.env.WASABI_BUCKET_NAME || !process.env.WASABI_ACCESS_KEY_ID) {
+    throw new Error('Wasabi configuration is missing. Please configure Wasabi environment variables on Render.');
+  }
+  
   const { PutObjectCommand } = require('@aws-sdk/client-s3');
   
   const params = {
@@ -250,7 +255,16 @@ router.post('/:id/poster', authenticateJWT, requireAdmin, (req, res, next) => {
       res.json({ poster_url: posterUrl });
     } catch (err) {
       console.error('Poster upload error:', err);
-      res.status(500).json({ message: 'Upload failed', error: err.message });
+      
+      // Provide specific error messages
+      if (err.message.includes('Wasabi configuration is missing')) {
+        res.status(500).json({ 
+          message: 'File upload service not configured. Please contact administrator.',
+          error: 'Wasabi configuration missing on server'
+        });
+      } else {
+        res.status(500).json({ message: 'Upload failed', error: err.message });
+      }
     }
   });
 });
@@ -282,7 +296,16 @@ router.post('/:id/movie', authenticateJWT, requireAdmin, (req, res, next) => {
       res.json({ movie_file_url: movieUrl });
     } catch (err) {
       console.error('Movie upload error:', err);
-      res.status(500).json({ message: 'Upload failed', error: err.message });
+      
+      // Provide specific error messages
+      if (err.message.includes('Wasabi configuration is missing')) {
+        res.status(500).json({ 
+          message: 'File upload service not configured. Please contact administrator.',
+          error: 'Wasabi configuration missing on server'
+        });
+      } else {
+        res.status(500).json({ message: 'Upload failed', error: err.message });
+      }
     }
   });
 });

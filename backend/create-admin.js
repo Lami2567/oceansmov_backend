@@ -1,9 +1,10 @@
 const bcrypt = require('bcryptjs');
-const pool = require('./db');
+const { getPool } = require('./db-neon');
 require('dotenv').config();
 
 async function createAdminUser() {
   try {
+    const pool = getPool();
     const username = 'admin';
     const password = 'admin123';
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,11 +33,49 @@ async function createAdminUser() {
     console.log('Password: admin123');
     console.log('\n🔗 Login at your frontend URL');
     
-    pool.end();
+    await pool.end();
   } catch (error) {
     console.error('❌ Error creating admin user:', error);
-    pool.end();
+    const pool = getPool();
+    await pool.end();
   }
 }
 
-createAdminUser(); 
+async function makeUserAdmin(targetUsername) {
+  try {
+    const pool = getPool();
+    // Check if user exists
+    const existingUser = await pool.query('SELECT * FROM users WHERE username = $1', [targetUsername]);
+    
+    if (existingUser.rows.length === 0) {
+      console.log(`❌ User '${targetUsername}' not found!`);
+      return;
+    }
+
+    // Update user to admin
+    await pool.query(
+      'UPDATE users SET is_admin = TRUE WHERE username = $1',
+      [targetUsername]
+    );
+    
+    console.log(`✅ User '${targetUsername}' is now an admin!`);
+    console.log('\n🔗 Login at your frontend URL');
+    
+    await pool.end();
+  } catch (error) {
+    console.error('❌ Error making user admin:', error);
+    const pool = getPool();
+    await pool.end();
+  }
+}
+
+// Check command line arguments
+const args = process.argv.slice(2);
+if (args.length > 0) {
+  const targetUsername = args[0];
+  console.log(`🎯 Making user '${targetUsername}' an admin...`);
+  makeUserAdmin(targetUsername);
+} else {
+  console.log('🔧 Creating default admin user...');
+  createAdminUser();
+} 
