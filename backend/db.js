@@ -14,7 +14,11 @@ console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    ca: undefined,
+    key: undefined,
+    cert: undefined,
+    checkServerIdentity: () => undefined
   },
   // Connection settings optimized for pooler
   connectionTimeoutMillis: 60000,
