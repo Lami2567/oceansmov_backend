@@ -4,6 +4,8 @@ const db = require('../db');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { s3Client } = require('../config/wasabi');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 // Helper function to upload to Wasabi with fallback
 const uploadToWasabi = async (file, key) => {
@@ -328,6 +330,47 @@ router.put('/:id', authenticateJWT, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('Database error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /movies/:id/video-url - get signed URL for video (authenticated users)
+router.get('/:id/video-url', authenticateJWT, async (req, res) => {
+  try {
+    const movieId = req.params.id;
+    
+    // Get movie details
+    const movieResult = await db.query('SELECT movie_file_url FROM movies WHERE id = $1', [movieId]);
+    
+    if (movieResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+    
+    const movie = movieResult.rows[0];
+    
+    if (!movie.movie_file_url) {
+      return res.status(404).json({ message: 'No video file found for this movie' });
+    }
+    
+    // Extract key from Wasabi URL
+    const url = new URL(movie.movie_file_url);
+    const key = url.pathname.replace(`/${process.env.WASABI_BUCKET_NAME}/`, '');
+    
+    // Generate signed URL
+    const command = new GetObjectCommand({
+      Bucket: process.env.WASABI_BUCKET_NAME,
+      Key: key
+    });
+    
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour
+    
+    res.json({ 
+      signed_url: signedUrl,
+      expires_in: 3600
+    });
+    
+  } catch (error) {
+    console.error('Error generating signed URL:', error);
+    res.status(500).json({ message: 'Failed to generate video URL' });
   }
 });
 
