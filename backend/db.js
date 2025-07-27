@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL) {
 
 console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 
-// PostgreSQL connection configuration for Supabase direct connection
+// PostgreSQL connection configuration with IPv6 support
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -20,13 +20,30 @@ const pool = new Pool({
     cert: undefined,
     checkServerIdentity: () => undefined
   },
-  // Connection settings for direct connection
-  connectionTimeoutMillis: 30000,
+  // Connection settings with IPv6 support
+  connectionTimeoutMillis: 60000, // Increased timeout for IPv6
   idleTimeoutMillis: 30000,
   max: 20,
   min: 1,
   // Application settings
-  application_name: 'movie-web-backend'
+  application_name: 'movie-web-backend',
+  // IPv6 specific settings
+  family: 6, // Force IPv6
+  lookup: (hostname, options, callback) => {
+    // Custom DNS lookup to prefer IPv6
+    const dns = require('dns');
+    dns.lookup(hostname, { family: 6, all: true }, (err, addresses) => {
+      if (err) {
+        callback(err);
+      } else if (addresses && addresses.length > 0) {
+        // Use first IPv6 address
+        callback(null, addresses[0].address, addresses[0].family);
+      } else {
+        // Fallback to default lookup
+        dns.lookup(hostname, options, callback);
+      }
+    });
+  }
 });
 
 // Test the connection
