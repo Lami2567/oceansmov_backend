@@ -13,19 +13,16 @@ console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 // PostgreSQL connection configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: {
+    rejectUnauthorized: false,
+    ca: undefined,
+    key: undefined,
+    cert: undefined
+  },
   // Connection settings
   connectionTimeoutMillis: 30000,
   idleTimeoutMillis: 30000,
-  max: 20,
-  // Force IPv4 by using direct connection parameters
-  ...(process.env.DATABASE_URL && {
-    host: new URL(process.env.DATABASE_URL).hostname,
-    port: new URL(process.env.DATABASE_URL).port || 5432,
-    user: new URL(process.env.DATABASE_URL).username,
-    password: new URL(process.env.DATABASE_URL).password,
-    database: new URL(process.env.DATABASE_URL).pathname.slice(1)
-  })
+  max: 20
 });
 
 // Test the connection
