@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL) {
 
 console.log('Database URL found:', process.env.DATABASE_URL ? 'Yes' : 'No');
 
-// PostgreSQL connection configuration for Supabase pooler
+// PostgreSQL connection configuration for Supabase direct connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -20,16 +20,13 @@ const pool = new Pool({
     cert: undefined,
     checkServerIdentity: () => undefined
   },
-  // Connection settings optimized for pooler
-  connectionTimeoutMillis: 60000,
+  // Connection settings for direct connection
+  connectionTimeoutMillis: 30000,
   idleTimeoutMillis: 30000,
-  max: 10, // Lower max connections for pooler
+  max: 20,
   min: 1,
-  // Pooler-specific settings
-  application_name: 'movie-web-backend',
-  // Keep connections alive
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 10000
+  // Application settings
+  application_name: 'movie-web-backend'
 });
 
 // Test the connection
