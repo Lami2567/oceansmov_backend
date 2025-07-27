@@ -1,10 +1,13 @@
 # Dependencies
 node_modules/
 */node_modules/
+**/node_modules/
 
 # Production builds
 client/build/
 client/dist/
+**/build/
+**/dist/
 
 # Environment variables
 .env

@@ -1,5 +1,12 @@
 # 🚀 Deployment Checklist - Vercel + Render + Supabase + Wasabi
 
+## ⚠️ Important: Memory Optimization
+
+**Before deploying, ensure:**
+- [ ] `node_modules` folders are removed from Git
+- [ ] Build artifacts are cleaned up
+- [ ] Repository size is under 100MB
+
 ## 📋 Pre-Deployment Setup
 
 ### 1. Supabase Database Setup
@@ -48,7 +55,7 @@ GENERATE_SOURCEMAP=false
 - [ ] Create new Web Service
 - [ ] Connect GitHub repository
 - [ ] Configure:
-  - [ ] Build Command: `npm install && npm run build`
+  - [ ] Build Command: `npm install`
   - [ ] Start Command: `npm start`
   - [ ] Root Directory: `backend`
 - [ ] Set environment variables (see above)
@@ -128,6 +135,11 @@ GENERATE_SOURCEMAP=false
 
 ## 🛠️ Troubleshooting
 
+### Memory Issues
+- [ ] Remove `node_modules` from Git: `git rm -r --cached node_modules`
+- [ ] Clean build artifacts: `git rm -r --cached client/build`
+- [ ] Check repository size: `git count-objects -vH`
+
 ### Common Issues
 - [ ] CORS errors → Check FRONTEND_URL in Render
 - [ ] Database connection → Verify Supabase connection string
@@ -141,6 +153,9 @@ node backend/test-db.js
 
 # Test Wasabi
 node backend/test-wasabi.js
+
+# Check repository size
+git count-objects -vH
 
 # Check logs
 # Render: Dashboard → Service → Logs
