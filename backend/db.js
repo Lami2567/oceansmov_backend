@@ -1,2 +1,2 @@
-// Use the intelligent auto-debug database connection system
-module.exports = require('./db-auto-debug'); 
+// Use the Neon database connection (Render-compatible)
+module.exports = require('./db-neon'); 
