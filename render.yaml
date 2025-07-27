@@ -3,7 +3,8 @@ services:
     name: movie-web-backend
     env: node
     plan: free
-    buildCommand: npm install
+    rootDir: backend
+    buildCommand: npm install --production
     startCommand: node bin/www
     envVars:
       - key: NODE_ENV
