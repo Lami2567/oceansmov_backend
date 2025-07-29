@@ -29,12 +29,12 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Note: Static file serving removed - files are served directly from Wasabi
+// Note: Static file serving removed - files are served directly from Cloudflare R2
 
 // API routes
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
-const moviesRouter = require('./routes/movies');
+const moviesRouter = require('./routes/movies-r2'); // Using R2 routes
 const reviewsRouter = require('./routes/reviews');
 const testRouter = require('./routes/test');
 
@@ -47,8 +47,9 @@ app.use('/api', testRouter);
 // API-only backend - frontend is served by Vercel
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'Movie Web API is running',
-    version: '1.0.0',
+    message: 'Movie Web API is running with Cloudflare R2',
+    version: '2.0.0',
+    storage: 'Cloudflare R2',
     endpoints: {
       test: '/api/test',
       movies: '/api/movies',
