@@ -9,16 +9,39 @@ const { GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require('@aw
 
 // Helper function to upload to Cloudflare R2
 const uploadToR2 = async (file, key) => {
-  const params = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-    Key: key,
-    Body: file.buffer,
-    ContentType: file.mimetype,
-    ACL: 'public-read'
-  };
-  
-  await r2Client.send(new PutObjectCommand(params));
-  return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
+  try {
+    console.log('🔧 uploadToR2 - Starting upload...');
+    console.log('📦 Bucket:', process.env.CLOUDFLARE_R2_BUCKET_NAME);
+    console.log('🔑 Key:', key);
+    console.log('📄 Content-Type:', file.mimetype);
+    console.log('📏 File size:', file.buffer.length, 'bytes');
+    
+    const params = {
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ACL: 'public-read'
+    };
+    
+    console.log('🚀 Sending PutObjectCommand to R2...');
+    await r2Client.send(new PutObjectCommand(params));
+    console.log('✅ R2 upload command successful');
+    
+    const publicUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
+    console.log('🔗 Generated public URL:', publicUrl);
+    
+    return publicUrl;
+  } catch (error) {
+    console.error('❌ uploadToR2 error:', error);
+    console.error('🔍 Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      statusCode: error.$metadata?.httpStatusCode
+    });
+    throw error;
+  }
 };
 
 // Helper function to generate signed URL for R2
@@ -204,13 +227,32 @@ router.post('/:id/poster', authenticateJWT, requireAdmin, (req, res, next) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
     
     try {
+      console.log('📤 Starting R2 poster upload...');
+      console.log('📁 File info:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+      console.log('🎬 Movie ID:', req.params.id);
+      
       const key = `posters/${req.params.id}_${Date.now()}_${req.file.originalname}`;
+      console.log('🔑 R2 Key:', key);
+      
       const posterUrl = await uploadToR2(req.file, key);
+      console.log('✅ R2 upload successful, URL:', posterUrl);
       
       await db.query('UPDATE movies SET poster_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [posterUrl, req.params.id]);
+      console.log('✅ Database updated successfully');
+      
       res.json({ poster_url: posterUrl });
     } catch (err) {
-      console.error('R2 poster upload error:', err);
+      console.error('❌ R2 poster upload error:', err);
+      console.error('🔍 Error stack:', err.stack);
+      console.error('📋 Error details:', {
+        name: err.name,
+        message: err.message,
+        code: err.code
+      });
       res.status(500).json({ message: 'Upload failed', error: err.message });
     }
   });
