@@ -111,6 +111,30 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /movies/genres - get all unique genres for filtering
+router.get('/genres', async (req, res) => {
+  try {
+    const result = await db.query('SELECT DISTINCT genre FROM movies WHERE genre IS NOT NULL AND genre != \'\' ORDER BY genre');
+    const genres = result.rows.map(row => row.genre.trim()).filter(genre => genre);
+    res.json({ data: genres });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /movies/years - get all unique years for filtering
+router.get('/years', async (req, res) => {
+  try {
+    const result = await db.query('SELECT DISTINCT release_year FROM movies WHERE release_year IS NOT NULL ORDER BY release_year DESC');
+    const years = result.rows.map(row => row.release_year).filter(year => year);
+    res.json({ data: years });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // GET /movies/:id - get single movie (public)
 router.get('/:id', async (req, res) => {
   try {
