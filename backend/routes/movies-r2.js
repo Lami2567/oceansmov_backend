@@ -100,6 +100,71 @@ const movieUpload = multer({
   }
 });
 
+// GET /movies - get all movies (public)
+router.get('/', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM movies ORDER BY created_at DESC');
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /movies/:id - get single movie (public)
+router.get('/:id', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM movies WHERE id = $1', [req.params.id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+    
+    res.json({ data: result.rows[0] });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// POST /movies - create new movie (admin only)
+router.post('/', authenticateJWT, requireAdmin, async (req, res) => {
+  try {
+    const { title, description, release_year, genre } = req.body;
+    
+    const result = await db.query(
+      'INSERT INTO movies (title, description, release_year, genre) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, description, release_year, genre]
+    );
+    
+    res.status(201).json({ data: result.rows[0] });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// PUT /movies/:id - update movie (admin only)
+router.put('/:id', authenticateJWT, requireAdmin, async (req, res) => {
+  try {
+    const { title, description, release_year, genre } = req.body;
+    
+    const result = await db.query(
+      'UPDATE movies SET title = $1, description = $2, release_year = $3, genre = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
+      [title, description, release_year, genre, req.params.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+    
+    res.json({ data: result.rows[0] });
+  } catch (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // POST /movies/:id/poster - upload poster to R2 (admin only)
 router.post('/:id/poster', authenticateJWT, requireAdmin, (req, res, next) => {
   posterUpload.single('poster')(req, res, async (err) => {

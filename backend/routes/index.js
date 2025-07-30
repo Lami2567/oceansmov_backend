@@ -16,9 +16,20 @@ function authenticateJWT(req, res, next) {
   }
 }
 
-/* GET home page. */
+/* GET API status. */
 router.get('/', function(req, res, next) {
-  res.render('index', { title: 'Express' });
+  res.json({
+    message: 'Movie Web API is running',
+    version: '2.0.0',
+    storage: 'Cloudflare R2',
+    endpoints: {
+      test: '/api/test',
+      movies: '/api/movies',
+      users: '/api/users',
+      reviews: '/api/reviews'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Example protected route
