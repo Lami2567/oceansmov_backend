@@ -21,7 +21,12 @@ router.get('/test', async (req, res) => {
         nodeEnv: process.env.NODE_ENV || 'not set',
         databaseUrl: process.env.DATABASE_URL ? 'set' : 'not set',
         frontendUrl: process.env.FRONTEND_URL || 'not set',
-        wasabiBucket: process.env.WASABI_BUCKET_NAME || 'not set'
+        wasabiBucket: process.env.WASABI_BUCKET_NAME || 'not set',
+        cloudflareR2Endpoint: process.env.CLOUDFLARE_R2_ENDPOINT ? 'set' : 'not set',
+        cloudflareR2Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME ? 'set' : 'not set',
+        cloudflareR2AccessKey: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ? 'set' : 'not set',
+        cloudflareR2SecretKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ? 'set' : 'not set',
+        cloudflareR2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ? 'set' : 'not set'
       }
     });
   } catch (error) {
@@ -32,7 +37,12 @@ router.get('/test', async (req, res) => {
       error: error.message,
       environment: {
         nodeEnv: process.env.NODE_ENV || 'not set',
-        databaseUrl: process.env.DATABASE_URL ? 'set' : 'not set'
+        databaseUrl: process.env.DATABASE_URL ? 'set' : 'not set',
+        cloudflareR2Endpoint: process.env.CLOUDFLARE_R2_ENDPOINT ? 'set' : 'not set',
+        cloudflareR2Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME ? 'set' : 'not set',
+        cloudflareR2AccessKey: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ? 'set' : 'not set',
+        cloudflareR2SecretKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ? 'set' : 'not set',
+        cloudflareR2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ? 'set' : 'not set'
       }
     });
   }
