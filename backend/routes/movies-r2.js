@@ -301,16 +301,31 @@ router.get('/:id/video-url', authenticateJWT, async (req, res) => {
     if (!movie.movie_file_url) {
       return res.status(404).json({ message: 'No video file found for this movie' });
     }
-    
-    // Extract key from R2 URL
+  
+    // Extract object key from public R2 URL in a robust way
+    // Handles URLs like:
+    // - https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
+    // - https://<bucket>.<account>.r2.cloudflarestorage.com/<key>
+    // - https://cdn.example.com/<key>
     const url = new URL(movie.movie_file_url);
-    const key = url.pathname.replace(`/${process.env.CLOUDFLARE_R2_BUCKET_NAME}/`, '');
-    
-    const signedUrl = await generateR2SignedUrl(key, 3600); // 1 hour
+    let keyPath = decodeURIComponent(url.pathname || '');
+    // remove leading slashes
+    keyPath = keyPath.replace(/^\/+/, '');
+    // if path starts with the bucket name, strip it
+    const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME;
+    if (bucket && (keyPath === bucket || keyPath.startsWith(bucket + '/'))) {
+      keyPath = keyPath.slice(bucket.length).replace(/^\/+/, '');
+    }
+    if (!keyPath) {
+      return res.status(500).json({ message: 'Failed to derive R2 object key from URL' });
+    }
+
+    const signedUrl = await generateR2SignedUrl(keyPath, 3600); // 1 hour
     
     res.json({ 
       signed_url: signedUrl,
-      expires_in: 3600
+      expires_in: 3600,
+      key: keyPath
     });
     
   } catch (error) {
