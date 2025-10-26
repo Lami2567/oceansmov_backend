@@ -15,9 +15,15 @@ CREATE TABLE IF NOT EXISTS movies (
   genre VARCHAR(100),
   poster_url TEXT,
   movie_file_url TEXT,
+  published BOOLEAN DEFAULT FALSE,
+  recommended BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Backfill for existing deployments (no-op if columns already exist)
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS published BOOLEAN DEFAULT FALSE;
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS recommended BOOLEAN DEFAULT FALSE;
 
 -- Reviews table
 CREATE TABLE IF NOT EXISTS reviews (

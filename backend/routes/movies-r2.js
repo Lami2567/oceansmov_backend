@@ -194,17 +194,25 @@ router.post('/', authenticateJWT, requireAdmin, async (req, res) => {
 // PUT /movies/:id - update movie (admin only)
 router.put('/:id', authenticateJWT, requireAdmin, async (req, res) => {
   try {
-    const { title, description, release_year, genre } = req.body;
-    
-    const result = await db.query(
-      'UPDATE movies SET title = $1, description = $2, release_year = $3, genre = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
-      [title, description, release_year, genre, req.params.id]
-    );
-    
+    // Build dynamic update based on provided fields
+    const allowed = ['title','description','release_year','genre','published','recommended','poster_url','movie_file_url'];
+    const sets = [];
+    const values = [];
+    let idx = 1;
+    for (const k of allowed) {
+      if (Object.prototype.hasOwnProperty.call(req.body, k)) {
+        sets.push(`${k} = $${idx++}`);
+        values.push(req.body[k]);
+      }
+    }
+    sets.push(`updated_at = CURRENT_TIMESTAMP`);
+    const sql = `UPDATE movies SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`;
+    values.push(req.params.id);
+
+    const result = await db.query(sql, values);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Movie not found' });
     }
-    
     res.json({ data: result.rows[0] });
   } catch (err) {
     console.error('Database error:', err);
