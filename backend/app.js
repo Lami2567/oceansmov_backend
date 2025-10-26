@@ -12,17 +12,17 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// CORS configuration for production
+// CORS configuration (allow any localhost origin in development, strict in production)
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env.NODE_ENV === 'production'
     ? [
         'https://oceansmov.vercel.app',
         'https://oceansmov-5jrsz4urx-lanes-projects-cbbebf7b.vercel.app',
-        'https://*.vercel.app',
-        'https://*.onrender.com',
+        /https:\/\/.*\.vercel\.app$/,
+        /https:\/\/.*\.onrender\.com$/,
         process.env.FRONTEND_URL
-      ].filter(Boolean) // Remove any undefined values
-    : 'http://localhost:3000',
+      ].filter(Boolean)
+    : true, // reflect request origin for local dev (Flutter web runs on random localhost ports)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
