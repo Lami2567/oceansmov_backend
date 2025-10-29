@@ -4,8 +4,11 @@ const db = require('../db');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { r2Client } = require('../config/cloudflare-r2');
+const ORACLE_BASE = process.env.ORACLE_MUSIC_BASE_URL; // e.g., https://.../p/<token>/n/<ns>/b/<bucket>/o/
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const https = require('https');
+const { URL } = require('url');
 
 // Auth helpers
 function authenticateJWT(req, res, next) {
@@ -95,8 +98,9 @@ router.get('/playlists/:id', async (req,res)=>{
     const t = await db.query(Q.playlistTracks,[req.params.id]);
     // attach signed urls
     const items = await Promise.all(t.rows.map(async row=>{
-      const key = row.file_path; // stored key without bucket prefix
-      const url = await r2Signed(key, 3600);
+      const key = row.file_path;
+      // If Oracle base configured, stream directly from Oracle PAR base
+      const url = ORACLE_BASE ? `${ORACLE_BASE}${key}` : await r2Signed(key, 3600);
       return { ...row, stream_url: url };
     }));
     res.json({ data: pl.rows[0], tracks: items });
@@ -106,12 +110,67 @@ router.get('/tracks/:id', async (req,res)=>{
   try{
     const t = await db.query('SELECT id, artist_id, title, duration_seconds, file_path, mime_type, size_bytes, release_date FROM tracks WHERE id=$1',[req.params.id]);
     if (t.rows.length===0) return res.status(404).json({message:'Track not found'});
-    const key = t.rows[0].file_path; const url = await r2Signed(key, 3600);
+    const key = t.rows[0].file_path; 
+    const url = ORACLE_BASE ? `${ORACLE_BASE}${key}` : await r2Signed(key, 3600);
     res.json({ data: { ...t.rows[0], stream_url: url } });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
 
 // Admin endpoints
+// Generate Oracle pre-authenticated upload URL (frontend will PUT directly)
+router.post('/oracle/presign', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    if (!ORACLE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_BASE_URL not configured' });
+    const { type, artistId, filename } = req.body;
+    if (!filename) return res.status(400).json({ message:'filename required' });
+    let key;
+    if (type === 'artist_image') {
+      key = `music/artists/${artistId || 'new'}/${Date.now()}_${filename}`;
+    } else {
+      key = `music/tracks/${artistId || 'unknown'}/${Date.now()}_${filename}`;
+    }
+    const upload_url = `${ORACLE_BASE}${key}`; // PAR base permits PUT
+    const public_url = `${ORACLE_BASE}${key}`;  // same base for GET with PAR
+    res.json({ upload_url, public_url, file_path: key });
+  }catch(e){ res.status(500).json({ message:'Server error' }); }
+});
+
+// Diagnostics: attempt a small PUT to Oracle and report status/headers
+router.post('/oracle/diagnostics', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    if (!ORACLE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_BASE_URL not configured' });
+    const key = `music/diagnostics/ping_${Date.now()}.txt`;
+    const urlStr = `${ORACLE_BASE}${key}`;
+    const u = new URL(urlStr);
+    const body = 'ping';
+
+    const putResult = await new Promise((resolve)=>{
+      const reqOpt = { method: 'PUT', hostname: u.hostname, path: u.pathname + u.search, headers: { 'Content-Type':'text/plain', 'Content-Length': Buffer.byteLength(body) } };
+      const r = https.request(reqOpt, (resp)=>{
+        let data=''; resp.on('data',d=> data+=d); resp.on('end', ()=> resolve({ status: resp.statusCode, headers: resp.headers, body: data }));
+      });
+      r.on('error', (e)=> resolve({ error: e.message }));
+      r.write(body); r.end();
+    });
+
+    let diagnosis = 'unknown';
+    if (putResult.error) diagnosis = `network_error: ${putResult.error}`;
+    else if (putResult.status>=200 && putResult.status<300) diagnosis = 'ok';
+    else if (putResult.status===403) diagnosis = 'forbidden (PAR expired or invalid)';
+    else if (putResult.status===405) diagnosis = 'method_not_allowed (PAR lacks write permissions)';
+    else if (putResult.status===400) diagnosis = 'bad_request (URL or headers)';
+
+    return res.json({
+      key,
+      upload_url: urlStr,
+      result: putResult,
+      diagnosis
+    });
+  }catch(e){
+    res.status(500).json({ message:'diagnostic_error', error: e.message });
+  }
+});
+
 router.post('/artists', authenticateJWT, requireAdmin, (req,res)=>{
   imageUpload.single('image')(req,res, async(err)=>{
     try{
@@ -134,6 +193,32 @@ router.post('/artists/:id/playlists', authenticateJWT, requireAdmin, async (req,
     res.status(201).json({ data: r.rows[0] });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
+// Metadata finalize endpoint for direct Oracle uploads
+router.post('/artists/:id/tracks-meta', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    let { tracks, playlistId, createPlaylistName } = req.body;
+    if (!Array.isArray(tracks) || tracks.length===0) return res.status(400).json({ message:'tracks required' });
+    // ensure playlist if requested
+    if (!playlistId && createPlaylistName){
+      const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, createPlaylistName]);
+      playlistId = pr.rows[0].id;
+    }
+    const out = [];
+    for (let i=0;i<tracks.length;i++){
+      const t = tracks[i];
+      const r = await db.query(`INSERT INTO tracks (artist_id, title, duration_seconds, file_url, file_path, mime_type, size_bytes, release_date, created_by)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [req.params.id, t.title, t.duration_seconds||0, ORACLE_BASE? `${ORACLE_BASE}${t.file_path}` : t.file_url, t.file_path, t.mime_type, t.size_bytes||0, t.release_date||null, req.user.id]);
+      const track = r.rows[0];
+      if (playlistId){
+        await db.query('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES ($1,$2,$3)',[playlistId, track.id, i+1]);
+      }
+      out.push(track);
+    }
+    res.status(201).json({ data: out, playlist_id: playlistId });
+  }catch(e){ res.status(500).json({ message:'Server error' }); }
+});
+
 router.post('/artists/:id/tracks', authenticateJWT, requireAdmin, (req,res)=>{
   audioUpload.array('tracks')(req,res, async(err)=>{
     try{
