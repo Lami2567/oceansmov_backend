@@ -4,7 +4,11 @@ const db = require('../db');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const { r2Client } = require('../config/cloudflare-r2');
-const ORACLE_BASE = process.env.ORACLE_MUSIC_BASE_URL; // e.g., https://.../p/<token>/n/<ns>/b/<bucket>/o/
+const ORACLE_WRITE_BASE = process.env.ORACLE_MUSIC_WRITE_BASE_URL || process.env.ORACLE_MUSIC_BASE_URL; // write PAR base
+const ORACLE_READ_BASE = process.env.ORACLE_MUSIC_READ_BASE_URL || process.env.ORACLE_MUSIC_BASE_URL;  // read PAR base (or public URL)
+const ORACLE_PREFIX = process.env.ORACLE_MUSIC_PREFIX || 'music/'; // enforced upload prefix
+// Note: We use Oracle Pre-Authenticated Requests (PAR) so the frontend can PUT directly to Object Storage.
+// The backend constructs keys under a controlled prefix and returns a scoped URL; backend never proxies the file bytes.
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const https = require('https');
@@ -64,6 +68,26 @@ async function r2Signed(key, ttl=3600){
   return await getSignedUrl(r2Client, new GetObjectCommand({ Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME, Key: key }), { expiresIn: ttl });
 }
 
+// Utility
+function _slugify(s){
+  return (s||'').toString().toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+function _safeFile(name){
+  return (name||'').toString().replace(/[^a-zA-Z0-9_.-]+/g,'_');
+}
+function _parseOracleBase(baseUrl){
+  try{
+    const u = new URL(baseUrl);
+    const parts = u.pathname.split('/').filter(Boolean);
+    // expect: ['p','<token>','n','<ns>','b','<bucket>','o']
+    const nIdx = parts.indexOf('n'); const bIdx = parts.indexOf('b');
+    const ns = nIdx>=0? parts[nIdx+1] : undefined;
+    const bucket = bIdx>=0? parts[bIdx+1] : undefined;
+    const endsWithO = parts[parts.length-1]==='o';
+    return { host: u.host, ns, bucket, endsWithO };
+  }catch(_){ return {}; }
+}
+
 // SQL helpers
 const Q = {
   listArtists: 'SELECT id, name, slug, image_url, created_at FROM artists ORDER BY created_at DESC LIMIT $1 OFFSET $2',
@@ -100,7 +124,7 @@ router.get('/playlists/:id', async (req,res)=>{
     const items = await Promise.all(t.rows.map(async row=>{
       const key = row.file_path;
       // If Oracle base configured, stream directly from Oracle PAR base
-      const url = ORACLE_BASE ? `${ORACLE_BASE}${key}` : await r2Signed(key, 3600);
+const url = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${key}` : await r2Signed(key, 3600);
       return { ...row, stream_url: url };
     }));
     res.json({ data: pl.rows[0], tracks: items });
@@ -111,7 +135,7 @@ router.get('/tracks/:id', async (req,res)=>{
     const t = await db.query('SELECT id, artist_id, title, duration_seconds, file_path, mime_type, size_bytes, release_date FROM tracks WHERE id=$1',[req.params.id]);
     if (t.rows.length===0) return res.status(404).json({message:'Track not found'});
     const key = t.rows[0].file_path; 
-    const url = ORACLE_BASE ? `${ORACLE_BASE}${key}` : await r2Signed(key, 3600);
+const url = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${key}` : await r2Signed(key, 3600);
     res.json({ data: { ...t.rows[0], stream_url: url } });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
@@ -120,27 +144,31 @@ router.get('/tracks/:id', async (req,res)=>{
 // Generate Oracle pre-authenticated upload URL (frontend will PUT directly)
 router.post('/oracle/presign', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
-    if (!ORACLE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_BASE_URL not configured' });
-    const { type, artistId, filename } = req.body;
+    if (!ORACLE_WRITE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_WRITE_BASE_URL not configured' });
+    const { type, artistId, artistSlug, filename } = req.body;
     if (!filename) return res.status(400).json({ message:'filename required' });
+    const slug = _slugify(artistSlug || artistId || 'artist');
+    const safe = _safeFile(filename);
+    // Constrain uploads to music/<artist>/ paths only
     let key;
-    if (type === 'artist_image') {
-      key = `music/artists/${artistId || 'new'}/${Date.now()}_${filename}`;
+if (type === 'artist_image') {
+      key = `${ORACLE_PREFIX}${slug}/artist_${Date.now()}.jpg`;
     } else {
-      key = `music/tracks/${artistId || 'unknown'}/${Date.now()}_${filename}`;
+      key = `${ORACLE_PREFIX}${slug}/tracks/${Date.now()}_${safe}`;
     }
-    const upload_url = `${ORACLE_BASE}${key}`; // PAR base permits PUT
-    const public_url = `${ORACLE_BASE}${key}`;  // same base for GET with PAR
-    res.json({ upload_url, public_url, file_path: key });
-  }catch(e){ res.status(500).json({ message:'Server error' }); }
+    const upload_url = `${ORACLE_WRITE_BASE}${key}`; // PAR base permits PUT
+    const public_url = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${key}` : null;
+res.json({ upload_url, public_url, file_path: key, enforced_prefix: `${ORACLE_PREFIX}${slug}/` });
+  }catch(e){ res.status(500).json({ message:'Server error', error: e.message }); }
 });
 
 // Diagnostics: attempt a small PUT to Oracle and report status/headers
 router.post('/oracle/diagnostics', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
     if (!ORACLE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_BASE_URL not configured' });
-    const key = `music/diagnostics/ping_${Date.now()}.txt`;
-    const urlStr = `${ORACLE_BASE}${key}`;
+const key = `${ORACLE_PREFIX}diagnostics/ping_${Date.now()}.txt`;
+    const urlStr = `${ORACLE_WRITE_BASE}${key}`;
+    const parsed = _parseOracleBase(ORACLE_WRITE_BASE||'');
     const u = new URL(urlStr);
     const body = 'ping';
 
@@ -163,6 +191,7 @@ router.post('/oracle/diagnostics', authenticateJWT, requireAdmin, async (req,res
     return res.json({
       key,
       upload_url: urlStr,
+      parsed_base: parsed,
       result: putResult,
       diagnosis
     });
@@ -171,7 +200,19 @@ router.post('/oracle/diagnostics', authenticateJWT, requireAdmin, async (req,res
   }
 });
 
-router.post('/artists', authenticateJWT, requireAdmin, (req,res)=>{
+// Create artist metadata (image already uploaded by frontend via Oracle PAR and passed as image_path)
+router.post('/artists', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    // Accept JSON body: { name, slug, image_path? }
+    const { name, slug, image_path } = req.body;
+    let imageUrl = null;
+    if (image_path) {
+      imageUrl = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${image_path}` : image_path;
+    }
+    const r = await db.query('INSERT INTO artists (name, slug, image_url) VALUES ($1,$2,$3) RETURNING *',[name, slug, imageUrl]);
+    res.status(201).json({ data: r.rows[0] });
+  }catch(e){ res.status(400).json({ message: e.message || 'invalid image type' }); }
+});
   imageUpload.single('image')(req,res, async(err)=>{
     try{
       if (err) return res.status(400).json({ message: err.message });
