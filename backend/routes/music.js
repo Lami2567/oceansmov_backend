@@ -165,7 +165,7 @@ res.json({ upload_url, public_url, file_path: key, enforced_prefix: `${ORACLE_PR
 // Diagnostics: attempt a small PUT to Oracle and report status/headers
 router.post('/oracle/diagnostics', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
-    if (!ORACLE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_BASE_URL not configured' });
+    if (!ORACLE_WRITE_BASE) return res.status(500).json({ message:'ORACLE_MUSIC_WRITE_BASE_URL not configured' });
 const key = `${ORACLE_PREFIX}diagnostics/ping_${Date.now()}.txt`;
     const urlStr = `${ORACLE_WRITE_BASE}${key}`;
     const parsed = _parseOracleBase(ORACLE_WRITE_BASE||'');
@@ -213,20 +213,6 @@ router.post('/artists', authenticateJWT, requireAdmin, async (req,res)=>{
     res.status(201).json({ data: r.rows[0] });
   }catch(e){ res.status(400).json({ message: e.message || 'invalid image type' }); }
 });
-  imageUpload.single('image')(req,res, async(err)=>{
-    try{
-      if (err) return res.status(400).json({ message: err.message });
-      const { name, slug } = req.body;
-      let imageUrl = req.body.image_url;
-      if (req.file){
-        const key = `music/artists/${Date.now()}_${req.file.originalname}`;
-        imageUrl = await r2Put(req.file, key);
-      }
-      const r = await db.query('INSERT INTO artists (name, slug, image_url) VALUES ($1,$2,$3) RETURNING *',[name, slug, imageUrl]);
-      res.status(201).json({ data: r.rows[0] });
-    }catch(e){ res.status(500).json({ message:'Server error' }); }
-  });
-});
 router.post('/artists/:id/playlists', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
     const { name, description } = req.body;
@@ -249,7 +235,7 @@ router.post('/artists/:id/tracks-meta', authenticateJWT, requireAdmin, async (re
       const t = tracks[i];
       const r = await db.query(`INSERT INTO tracks (artist_id, title, duration_seconds, file_url, file_path, mime_type, size_bytes, release_date, created_by)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-        [req.params.id, t.title, t.duration_seconds||0, ORACLE_BASE? `${ORACLE_BASE}${t.file_path}` : t.file_url, t.file_path, t.mime_type, t.size_bytes||0, t.release_date||null, req.user.id]);
+        [req.params.id, t.title, t.duration_seconds||0, ORACLE_READ_BASE? `${ORACLE_READ_BASE}${t.file_path}` : t.file_url, t.file_path, t.mime_type, t.size_bytes||0, t.release_date||null, req.user.id]);
       const track = r.rows[0];
       if (playlistId){
         await db.query('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES ($1,$2,$3)',[playlistId, track.id, i+1]);
