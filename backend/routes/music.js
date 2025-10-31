@@ -327,6 +327,15 @@ router.delete('/playlists/:id', authenticateJWT, requireAdmin, async (req,res)=>
     res.json({ ok:true });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
+router.put('/tracks/:id', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    const { title, description } = req.body;
+    if (!title) return res.status(400).json({ message:'title required' });
+    const r = await db.query('UPDATE tracks SET title=$1, description=$2 WHERE id=$3 RETURNING *',[title, description||null, req.params.id]);
+    if (r.rows.length===0) return res.status(404).json({message:'Track not found'});
+    res.json({ data: r.rows[0] });
+  }catch(e){ res.status(500).json({ message:'Server error' }); }
+});
 router.delete('/tracks/:id', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
     // soft delete: mark file_url null and remove from R2
