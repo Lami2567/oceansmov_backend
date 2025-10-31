@@ -11,12 +11,14 @@ CREATE TABLE IF NOT EXISTS tracks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id UUID REFERENCES artists(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
+  description TEXT,
   duration_seconds INT,
   file_url TEXT,
   file_path TEXT,
   mime_type VARCHAR(100),
   size_bytes BIGINT,
   release_date DATE,
+  play_count INT DEFAULT 0,
   created_by INT REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
