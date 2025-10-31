@@ -94,8 +94,8 @@ const Q = {
   getArtist: 'SELECT id, name, slug, image_url, created_at FROM artists WHERE id = $1',
   artistPlaylists: 'SELECT id, name, description FROM playlists WHERE artist_id = $1 ORDER BY created_at DESC',
   getPlaylist: 'SELECT id, artist_id, name, description FROM playlists WHERE id = $1',
-  playlistTracks: `SELECT t.id, t.title, t.duration_seconds, t.mime_type, t.file_path, t.release_date
-                   FROM playlist_tracks pt JOIN tracks t ON pt.track_id = t.id WHERE pt.playlist_id = $1 ORDER BY pt.position ASC, pt.created_at ASC`,
+  playlistTracks: `SELECT t.id, t.artist_id, t.title, t.duration_seconds, t.mime_type, t.file_path, t.release_date, a.name as artist, a.image_url
+                   FROM playlist_tracks pt JOIN tracks t ON pt.track_id = t.id LEFT JOIN artists a ON t.artist_id = a.id WHERE pt.playlist_id = $1 ORDER BY pt.position ASC, pt.created_at ASC`,
   listTracks: `SELECT t.id, t.artist_id, t.title, t.duration_seconds, t.file_path, t.mime_type, t.release_date, t.created_at, a.name as artist, a.image_url as image_url
                FROM tracks t LEFT JOIN artists a ON t.artist_id = a.id WHERE t.file_url IS NOT NULL`,
   mostPlayedTracks: `SELECT t.id, t.artist_id, t.title, t.duration_seconds, t.file_path, t.mime_type, t.release_date, t.created_at, a.name as artist, a.image_url as image_url
