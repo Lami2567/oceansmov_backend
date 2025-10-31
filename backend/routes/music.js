@@ -258,14 +258,19 @@ router.post('/artists/:id/playlists', authenticateJWT, requireAdmin, async (req,
 router.post('/artists/:id/tracks-meta', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
     let { tracks, playlistId, createPlaylistName } = req.body;
+    console.log('[tracks-meta] Received:', { playlistId, createPlaylistName, artistId: req.params.id, trackCount: tracks?.length });
     if (!Array.isArray(tracks) || tracks.length===0) return res.status(400).json({ message:'tracks required' });
     // ensure playlist - create default if not specified
     if (!playlistId && !createPlaylistName){
+      console.log('[tracks-meta] Creating default playlist');
       const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, 'Uploaded Tracks']);
       playlistId = pr.rows[0].id;
+      console.log('[tracks-meta] Created playlist:', playlistId);
     } else if (!playlistId && createPlaylistName){
+      console.log('[tracks-meta] Creating playlist with name:', createPlaylistName);
       const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, createPlaylistName]);
       playlistId = pr.rows[0].id;
+      console.log('[tracks-meta] Created playlist:', playlistId);
     }
     const out = [];
     for (let i=0;i<tracks.length;i++){
@@ -289,14 +294,19 @@ router.post('/artists/:id/tracks', authenticateJWT, requireAdmin, (req,res)=>{
       if (err) return res.status(400).json({ message: err.message });
       const { titles, durations, releaseDates, playlistId, createPlaylistName, explicit } = req.body;
       const files = req.files || [];
+      console.log('[tracks] Received:', { playlistId, createPlaylistName, artistId: req.params.id, fileCount: files.length });
       // ensure playlist - create default if not specified
       let pid = playlistId;
       if (!pid && !createPlaylistName){
+        console.log('[tracks] Creating default playlist');
         const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, 'Uploaded Tracks']);
         pid = pr.rows[0].id;
+        console.log('[tracks] Created playlist:', pid);
       } else if (!pid && createPlaylistName){
+        console.log('[tracks] Creating playlist with name:', createPlaylistName);
         const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, createPlaylistName]);
         pid = pr.rows[0].id;
+        console.log('[tracks] Created playlist:', pid);
       }
       const results = [];
       for (let i=0;i<files.length;i++){
