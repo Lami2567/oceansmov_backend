@@ -285,6 +285,14 @@ router.put('/playlists/:id/add-track', authenticateJWT, requireAdmin, async (req
     res.json({ ok: true });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
+router.delete('/playlists/:id', authenticateJWT, requireAdmin, async (req,res)=>{
+  try{
+    // Deletes playlist and cascades playlist_tracks (DB schema has ON DELETE CASCADE)
+    const r = await db.query('DELETE FROM playlists WHERE id=$1 RETURNING id',[req.params.id]);
+    if (r.rowCount===0) return res.status(404).json({ message:'Playlist not found' });
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ message:'Server error' }); }
+});
 router.delete('/tracks/:id', authenticateJWT, requireAdmin, async (req,res)=>{
   try{
     // soft delete: mark file_url null and remove from R2
