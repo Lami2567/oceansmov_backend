@@ -96,6 +96,10 @@ const Q = {
   getPlaylist: 'SELECT id, artist_id, name, description FROM playlists WHERE id = $1',
   playlistTracks: `SELECT t.id, t.title, t.duration_seconds, t.mime_type, t.file_path, t.release_date
                    FROM playlist_tracks pt JOIN tracks t ON pt.track_id = t.id WHERE pt.playlist_id = $1 ORDER BY pt.position ASC, pt.created_at ASC`,
+  listTracks: `SELECT t.id, t.artist_id, t.title, t.duration_seconds, t.file_path, t.mime_type, t.release_date, t.created_at, a.name as artist, a.image_url as image_url
+               FROM tracks t LEFT JOIN artists a ON t.artist_id = a.id WHERE t.file_url IS NOT NULL`,
+  mostPlayedTracks: `SELECT t.id, t.artist_id, t.title, t.duration_seconds, t.file_path, t.mime_type, t.release_date, t.created_at, a.name as artist, a.image_url as image_url
+                    FROM tracks t LEFT JOIN artists a ON t.artist_id = a.id WHERE t.file_url IS NOT NULL ORDER BY t.play_count DESC NULLS LAST`,
 };
 
 // Public endpoints
@@ -128,6 +132,31 @@ const url = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${key}` : await r2Signed(key,
       return { ...row, stream_url: url };
     }));
     res.json({ data: pl.rows[0], tracks: items });
+  }catch(e){ res.status(500).json({ message:'Server error' }); }
+});
+// List tracks with pagination and sorting
+router.get('/tracks', async (req,res)=>{
+  try{
+    const limit = Math.min(parseInt(req.query.limit||'10'),100);
+    const offset = Math.max(parseInt(req.query.offset||'0'),0);
+    const sort = req.query.sort || 'latest'; // 'latest' or 'plays'
+    
+    let query = Q.listTracks;
+    if (sort === 'plays') {
+      query = Q.mostPlayedTracks;
+    } else {
+      query += ' ORDER BY t.created_at DESC';
+    }
+    query += ` LIMIT $1 OFFSET $2`;
+    
+    const r = await db.query(query, [limit, offset]);
+    // Attach stream URLs
+    const items = await Promise.all(r.rows.map(async row=>{
+      const key = row.file_path;
+      const url = ORACLE_READ_BASE ? `${ORACLE_READ_BASE}${key}` : await r2Signed(key, 3600);
+      return { ...row, stream_url: url };
+    }));
+    res.json({ data: items, paging: { limit, offset } });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
 router.get('/tracks/:id', async (req,res)=>{
