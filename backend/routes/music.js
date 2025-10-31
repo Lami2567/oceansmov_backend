@@ -116,7 +116,12 @@ router.get('/artists/:id', async (req,res)=>{
     const a = await db.query(Q.getArtist,[req.params.id]);
     if(a.rows.length===0) return res.status(404).json({message:'Artist not found'});
     const p = await db.query(Q.artistPlaylists,[req.params.id]);
-    res.json({ data: a.rows[0], playlists: p.rows });
+    // Fetch tracks for each playlist
+    const playlistsWithTracks = await Promise.all(p.rows.map(async (pl) => {
+      const tracks = await db.query(Q.playlistTracks, [pl.id]);
+      return { ...pl, tracks: tracks.rows };
+    }));
+    res.json({ data: a.rows[0], playlists: playlistsWithTracks });
   }catch(e){ res.status(500).json({ message:'Server error' }); }
 });
 router.get('/playlists/:id', async (req,res)=>{
