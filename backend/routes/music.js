@@ -259,8 +259,11 @@ router.post('/artists/:id/tracks-meta', authenticateJWT, requireAdmin, async (re
   try{
     let { tracks, playlistId, createPlaylistName } = req.body;
     if (!Array.isArray(tracks) || tracks.length===0) return res.status(400).json({ message:'tracks required' });
-    // ensure playlist if requested
-    if (!playlistId && createPlaylistName){
+    // ensure playlist - create default if not specified
+    if (!playlistId && !createPlaylistName){
+      const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, 'Uploaded Tracks']);
+      playlistId = pr.rows[0].id;
+    } else if (!playlistId && createPlaylistName){
       const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, createPlaylistName]);
       playlistId = pr.rows[0].id;
     }
@@ -286,9 +289,12 @@ router.post('/artists/:id/tracks', authenticateJWT, requireAdmin, (req,res)=>{
       if (err) return res.status(400).json({ message: err.message });
       const { titles, durations, releaseDates, playlistId, createPlaylistName, explicit } = req.body;
       const files = req.files || [];
-      // ensure playlist
+      // ensure playlist - create default if not specified
       let pid = playlistId;
-      if (!pid && createPlaylistName){
+      if (!pid && !createPlaylistName){
+        const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, 'Uploaded Tracks']);
+        pid = pr.rows[0].id;
+      } else if (!pid && createPlaylistName){
         const pr = await db.query('INSERT INTO playlists (artist_id, name) VALUES ($1,$2) RETURNING id',[req.params.id, createPlaylistName]);
         pid = pr.rows[0].id;
       }
