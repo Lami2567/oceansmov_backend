@@ -37,6 +37,7 @@ var usersRouter = require('./routes/users');
 const moviesRouter = require('./routes/movies-r2'); // Using R2 routes
 const reviewsRouter = require('./routes/reviews');
 const musicRouter = require('./routes/music');
+const radioRouter = require('./routes/radio');
 const testRouter = require('./routes/test');
 
 app.use('/api', indexRouter);
@@ -45,6 +46,7 @@ app.use('/api/movies', moviesRouter);
 app.use('/api/reviews', reviewsRouter);
 app.use('/api', testRouter);
 app.use('/api/music', musicRouter);
+app.use('/api/radio', radioRouter);
 
 // API-only backend - frontend is served by Vercel
 app.get('/', (req, res) => {

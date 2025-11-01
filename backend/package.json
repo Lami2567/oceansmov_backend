@@ -7,6 +7,8 @@
     "start": "node ./bin/www",
     "dev": "nodemon ./bin/www",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate": "node migrate.js",
+    "migrate:radio": "node migrate.js 20251101_radio_init.sql",
     "migrate-to-r2": "node migrate-to-r2.js",
     "test-r2": "node migrate-to-r2.js --test"
   },
